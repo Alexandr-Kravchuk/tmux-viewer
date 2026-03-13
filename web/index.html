@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>tmux viewer</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/ansi_up@5.2.1/ansi_up.js"></script>
+</head>
+<body>
+    <header>
+        <h1>tmux viewer</h1>
+        <div class="status">
+            <span id="connection-status" class="status-dot"></span>
+            <span id="session-count">0 sessions</span>
+        </div>
+    </header>
+
+    <main id="sessions-container">
+        <div class="loading">Loading tmux sessions...</div>
+    </main>
+    
+    <div id="confirm-modal" class="modal">
+        <div class="modal-content">
+            <h2>Confirm Action</h2>
+            <p id="modal-message"></p>
+            <div class="modal-buttons">
+                <button id="modal-cancel" class="btn btn-secondary">Cancel</button>
+                <button id="modal-confirm" class="btn btn-danger">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
