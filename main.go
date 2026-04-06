@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -12,6 +13,11 @@ import (
 )
 
 func handleSessions(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		handleCreateSession(w, r)
+		return
+	}
+
 	sessions, err := tmux.ListSessions()
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error listing sessions: %v", err), http.StatusInternalServerError)
@@ -142,43 +148,54 @@ func handleRenameSession(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func handleOpenITerm(w http.ResponseWriter, r *http.Request) {
+func handleOpenTerminal(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	parts := strings.Split(r.URL.Path, "/")
 	if len(parts) < 4 {
 		http.Error(w, "Invalid session path", http.StatusBadRequest)
 		return
 	}
-	
-	sessionName := parts[3]
-	
+
+	sessionName, _ := url.PathUnescape(parts[3])
+
 	script := fmt.Sprintf(`
-tell application "iTerm"
+tell application "Terminal"
 	activate
-	tell current window
-		create tab with default profile
-		tell current session
-			write text "tmux attach -t %s"
-		end tell
-	end tell
+	do script "tmux attach -t '%s'"
 end tell
-`, sessionName)
-	
+`, strings.ReplaceAll(sessionName, "'", "'\\''"))
+
 	cmd := exec.Command("osascript", "-e", script)
 	if err := cmd.Run(); err != nil {
-		http.Error(w, fmt.Sprintf("Error opening iTerm: %v", err), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Error opening Terminal: %v", err), http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"status":  "success",
-		"message": fmt.Sprintf("Opened session %s in iTerm2", sessionName),
+		"message": fmt.Sprintf("Opened session %s in Terminal", sessionName),
 	})
+}
+
+func handleCreateSession(w http.ResponseWriter, r *http.Request) {
+	var reqBody struct {
+		Name string `json:"name"`
+	}
+	json.NewDecoder(r.Body).Decode(&reqBody)
+
+	session, err := tmux.CreateSession(reqBody.Name)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error creating session: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(session)
 }
 
 func setupRoutes() *http.ServeMux {
@@ -192,8 +209,8 @@ func setupRoutes() *http.ServeMux {
 			handleSession(w, r)
 		} else if r.Method == http.MethodPut && strings.Contains(r.URL.Path, "/rename") {
 			handleRenameSession(w, r)
-		} else if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/open-iterm") {
-			handleOpenITerm(w, r)
+		} else if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/open-terminal") {
+			handleOpenTerminal(w, r)
 		} else {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}

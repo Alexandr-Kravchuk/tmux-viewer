@@ -47,12 +47,13 @@ h1 {
 }
 
 main {
-    padding: 20px;
+    padding: 12px;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
-    gap: 20px;
-    max-width: 1800px;
-    margin: 0 auto;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+    gap: 12px;
+    height: calc(100vh - 58px);
+    overflow: hidden;
 }
 
 .loading {
@@ -68,6 +69,9 @@ main {
     border-radius: 6px;
     overflow: hidden;
     transition: border-color 0.2s;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
 }
 
 .session-card:hover {
@@ -201,12 +205,13 @@ main {
 }
 
 .panes-container {
-    padding: 12px;
+    padding: 8px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    max-height: 600px;
+    gap: 8px;
     overflow-y: auto;
+    flex: 1;
+    min-height: 0;
 }
 
 .panes-container::-webkit-scrollbar {
@@ -231,6 +236,10 @@ main {
     border: 1px solid #21262d;
     border-radius: 4px;
     padding: 8px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
 }
 
 .pane-card.active {
@@ -271,8 +280,9 @@ main {
     overflow-x: auto;
     white-space: pre;
     color: #c5c8c6;
-    max-height: 300px;
     overflow-y: auto;
+    flex: 1;
+    min-height: 60px;
     font-family: 'Monaco', 'Menlo', 'Courier New', 'Courier', monospace;
     font-variant-ligatures: none;
     -webkit-font-smoothing: antialiased;
@@ -307,8 +317,48 @@ main {
     margin: 20px;
 }
 
-@media (max-width: 1400px) {
-    main {
-        grid-template-columns: 1fr;
-    }
+.btn-primary {
+    background: #1f6feb;
+    border: 1px solid #388bfd;
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    transition: all 0.2s;
+}
+
+.btn-primary:hover {
+    background: #388bfd;
+}
+
+.session-card.fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 999;
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.session-card.fullscreen .panes-container {
+    max-height: none;
+    flex: 1;
+}
+
+.session-card.fullscreen .pane-content {
+    max-height: none;
+    flex: 1;
+}
+
+body.has-fullscreen main {
+    overflow: hidden;
+}
+
+.fullscreen-btn:hover {
+    color: #58a6ff;
 }

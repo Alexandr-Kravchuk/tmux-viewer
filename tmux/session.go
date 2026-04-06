@@ -121,6 +121,36 @@ func listPanesForSession(sessionName string) ([]Pane, error) {
 	return panes, nil
 }
 
+func CreateSession(name string) (*Session, error) {
+	args := []string{"new-session", "-d", "-P", "-F", "#{session_id}|#{session_name}|#{session_windows}"}
+	if name != "" {
+		args = append(args, "-s", name)
+	}
+	cmd := exec.Command("tmux", args...)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("failed to create session: %w", err)
+	}
+
+	parts := strings.Split(strings.TrimSpace(out.String()), "|")
+	if len(parts) != 3 {
+		return nil, fmt.Errorf("unexpected output: %s", out.String())
+	}
+
+	session := &Session{
+		ID:   parts[0],
+		Name: parts[1],
+	}
+	fmt.Sscanf(parts[2], "%d", &session.Windows)
+
+	panes, err := listPanesForSession(session.Name)
+	if err == nil {
+		session.Panes = panes
+	}
+	return session, nil
+}
+
 func KillSession(nameOrID string) error {
 	cmd := exec.Command("tmux", "kill-session", "-t", nameOrID)
 	if err := cmd.Run(); err != nil {

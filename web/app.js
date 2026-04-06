@@ -21,6 +21,31 @@ let confirmModal = {
     }
 };
 
+function updateGridLayout(count) {
+    const container = document.getElementById('sessions-container');
+    if (!container) return;
+
+    let cols, rows;
+    if (count <= 1) { cols = 1; rows = 1; }
+    else if (count <= 3) { cols = 1; rows = count; }
+    else if (count <= 4) { cols = 2; rows = 2; }
+    else if (count <= 6) { cols = 2; rows = 3; }
+    else if (count <= 9) { cols = 3; rows = 3; }
+    else if (count <= 12) { cols = 3; rows = 4; }
+    else if (count <= 16) { cols = 4; rows = 4; }
+    else { cols = 4; rows = Math.ceil(count / 4); }
+
+    container.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+
+    if (count <= 16) {
+        container.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+        container.style.overflowY = 'hidden';
+    } else {
+        container.style.gridTemplateRows = '';
+        container.style.overflowY = 'auto';
+    }
+}
+
 function updateConnectionStatus(connected) {
     const statusDot = document.getElementById('connection-status');
     if (connected) {
@@ -135,21 +160,66 @@ async function renameSession(sessionId, oldName) {
     }
 }
 
-async function openInITerm(sessionName) {
+async function openInTerminal(sessionName) {
     try {
-        const response = await fetch(`/api/session/${encodeURIComponent(sessionName)}/open-iterm`, {
+        const response = await fetch(`/api/session/${encodeURIComponent(sessionName)}/open-terminal`, {
             method: 'POST'
         });
-        
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
         }
-        
-        const result = await response.json();
-        console.log(`Opened session ${sessionName} in iTerm2`);
+        console.log(`Opened session ${sessionName} in Terminal`);
     } catch (error) {
-        console.error(`Error opening iTerm2:`, error);
-        alert(`Failed to open iTerm2: ${error.message}`);
+        console.error(`Error opening Terminal:`, error);
+        alert(`Failed to open Terminal: ${error.message}`);
+    }
+}
+
+async function createNewSession() {
+    const name = prompt('Session name (leave empty for default):');
+    if (name === null) return;
+
+    try {
+        const response = await fetch('/api/sessions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name || '' })
+        });
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(text || `HTTP ${response.status}`);
+        }
+        const session = await response.json();
+        openInTerminal(session.name);
+    } catch (error) {
+        console.error('Error creating session:', error);
+        alert(`Failed to create session: ${error.message}`);
+    }
+}
+
+function toggleFullscreen(sessionId) {
+    const card = document.querySelector(`[data-session-id="${sessionId}"]`);
+    if (!card) return;
+
+    card.classList.toggle('fullscreen');
+    document.body.classList.toggle('has-fullscreen', card.classList.contains('fullscreen'));
+
+    const btn = card.querySelector('.fullscreen-btn');
+    if (btn) {
+        btn.innerHTML = card.classList.contains('fullscreen') ? '⊖' : '⊕';
+        btn.title = card.classList.contains('fullscreen') ? 'Exit fullscreen' : 'Fullscreen';
+    }
+
+    if (card.classList.contains('fullscreen')) {
+        const panesContainer = card.querySelector('.panes-container');
+        if (panesContainer) {
+            panesContainer.style.maxHeight = 'none';
+        }
+    } else {
+        const panesContainer = card.querySelector('.panes-container');
+        if (panesContainer) {
+            panesContainer.style.maxHeight = '';
+        }
     }
 }
 
@@ -207,15 +277,24 @@ function createSessionCard(session) {
     const actions = document.createElement('div');
     actions.className = 'session-actions';
     
+    const fullscreenBtn = document.createElement('button');
+    fullscreenBtn.className = 'action-btn fullscreen-btn';
+    fullscreenBtn.innerHTML = '⊕';
+    fullscreenBtn.title = 'Fullscreen';
+    fullscreenBtn.onclick = (e) => {
+        e.stopPropagation();
+        toggleFullscreen(session.id);
+    };
+
     const openBtn = document.createElement('button');
     openBtn.className = 'action-btn';
     openBtn.innerHTML = '⌘';
-    openBtn.title = 'Open in iTerm2';
+    openBtn.title = 'Open';
     openBtn.onclick = (e) => {
         e.stopPropagation();
-        openInITerm(session.name);
+        openInTerminal(session.name);
     };
-    
+
     const renameBtn = document.createElement('button');
     renameBtn.className = 'action-btn';
     renameBtn.innerHTML = '✎';
@@ -224,7 +303,7 @@ function createSessionCard(session) {
         e.stopPropagation();
         renameSession(session.id, session.name);
     };
-    
+
     const killBtn = document.createElement('button');
     killBtn.className = 'action-btn kill-btn';
     killBtn.innerHTML = '🗑';
@@ -233,7 +312,8 @@ function createSessionCard(session) {
         e.stopPropagation();
         killSession(session.id, session.name);
     };
-    
+
+    actions.appendChild(fullscreenBtn);
     actions.appendChild(openBtn);
     actions.appendChild(renameBtn);
     actions.appendChild(killBtn);
@@ -294,7 +374,8 @@ function renderSessions(sessions) {
         }
         
         updateSessionCount(sessions.length);
-        
+        updateGridLayout(sessions.length);
+
         const existingSessionIds = new Set(
             Array.from(container.querySelectorAll('.session-card'))
                 .map(card => card.dataset.sessionId)
