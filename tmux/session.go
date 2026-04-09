@@ -31,10 +31,15 @@ type Pane struct {
 
 func ListSessions() ([]Session, error) {
 	cmd := exec.Command("tmux", "list-sessions", "-F", "#{session_id}|#{session_name}|#{session_windows}")
-	var out bytes.Buffer
+	var out, stderr bytes.Buffer
 	cmd.Stdout = &out
-	
+	cmd.Stderr = &stderr
+
 	if err := cmd.Run(); err != nil {
+		msg := strings.ToLower(stderr.String())
+		if strings.Contains(msg, "no server running") || strings.Contains(msg, "no sessions") || out.Len() == 0 {
+			return []Session{}, nil
+		}
 		return nil, fmt.Errorf("failed to list sessions: %w", err)
 	}
 

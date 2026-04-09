@@ -163,9 +163,14 @@ func handleOpenTerminal(w http.ResponseWriter, r *http.Request) {
 	sessionName, _ := url.PathUnescape(parts[3])
 
 	script := fmt.Sprintf(`
-tell application "Terminal"
+tell application "iTerm2"
 	activate
-	do script "tmux attach -t '%s'"
+	tell current window
+		create tab with default profile
+		tell current session of current tab
+			write text "tmux attach -t '%s'"
+		end tell
+	end tell
 end tell
 `, strings.ReplaceAll(sessionName, "'", "'\\''"))
 
