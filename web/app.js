@@ -4,6 +4,99 @@ const paneContentCache = new Map();
 const DEBOUNCE_DELAY = 300;
 let updateTimer = null;
 let ansi_up = null;
+let draggedCard = null;
+const SESSION_ORDER_KEY = 'tmux-session-order';
+
+function loadSessionOrder() {
+    try {
+        const stored = localStorage.getItem(SESSION_ORDER_KEY);
+        return stored ? JSON.parse(stored) : [];
+    } catch {
+        return [];
+    }
+}
+
+function saveSessionOrder(ids) {
+    localStorage.setItem(SESSION_ORDER_KEY, JSON.stringify(ids));
+}
+
+function applyStoredOrder(container) {
+    if (draggedCard) return;
+    const order = loadSessionOrder();
+    if (order.length === 0) return;
+
+    const cards = Array.from(container.querySelectorAll('.session-card'));
+    const currentIds = cards.map(c => c.dataset.sessionId);
+
+    const expectedIds = [
+        ...order.filter(id => currentIds.includes(id)),
+        ...currentIds.filter(id => !order.includes(id))
+    ];
+
+    if (currentIds.join(',') === expectedIds.join(',')) return;
+
+    expectedIds.forEach(id => {
+        const card = container.querySelector(`[data-session-id="${id}"]`);
+        if (card) container.appendChild(card);
+    });
+}
+
+function initDragAndDrop(card) {
+    card.setAttribute('draggable', 'true');
+
+    card.addEventListener('dragstart', (e) => {
+        if (e.target.closest('.session-actions') || e.target.closest('.panes-container')) {
+            e.preventDefault();
+            return;
+        }
+        draggedCard = card;
+        card.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', card.dataset.sessionId);
+    });
+
+    card.addEventListener('dragend', () => {
+        card.classList.remove('dragging');
+        document.querySelectorAll('.session-card.drag-over').forEach(c => c.classList.remove('drag-over'));
+        draggedCard = null;
+    });
+
+    card.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        if (draggedCard && draggedCard !== card) {
+            e.dataTransfer.dropEffect = 'move';
+            document.querySelectorAll('.session-card.drag-over').forEach(c => c.classList.remove('drag-over'));
+            card.classList.add('drag-over');
+        }
+    });
+
+    card.addEventListener('dragleave', (e) => {
+        if (!card.contains(e.relatedTarget)) {
+            card.classList.remove('drag-over');
+        }
+    });
+
+    card.addEventListener('drop', (e) => {
+        e.preventDefault();
+        card.classList.remove('drag-over');
+        if (!draggedCard || draggedCard === card) return;
+
+        const container = card.parentElement;
+        const cards = Array.from(container.querySelectorAll('.session-card'));
+        const fromIndex = cards.indexOf(draggedCard);
+        const toIndex = cards.indexOf(card);
+
+        if (fromIndex < toIndex) {
+            card.after(draggedCard);
+        } else {
+            card.before(draggedCard);
+        }
+
+        saveSessionOrder(
+            Array.from(container.querySelectorAll('.session-card')).map(c => c.dataset.sessionId)
+        );
+    });
+}
 
 let confirmModal = {
     callback: null,
@@ -252,7 +345,9 @@ function createPaneElement(pane) {
     fetchPaneContent(pane.id).then(text => {
         content.classList.remove('loading');
         content.innerHTML = text;
-        content.scrollTop = content.scrollHeight;
+        requestAnimationFrame(() => {
+            content.scrollTop = content.scrollHeight;
+        });
     });
     
     return paneCard;
@@ -265,7 +360,12 @@ function createSessionCard(session) {
     
     const header = document.createElement('div');
     header.className = 'session-header';
-    
+
+    const dragHandle = document.createElement('div');
+    dragHandle.className = 'drag-handle';
+    dragHandle.innerHTML = '⠿';
+    dragHandle.title = 'Drag to reorder';
+
     const name = document.createElement('div');
     name.className = 'session-name';
     name.textContent = session.name;
@@ -318,6 +418,7 @@ function createSessionCard(session) {
     actions.appendChild(renameBtn);
     actions.appendChild(killBtn);
     
+    header.appendChild(dragHandle);
     header.appendChild(name);
     header.appendChild(info);
     header.appendChild(actions);
@@ -338,7 +439,9 @@ function createSessionCard(session) {
     
     card.appendChild(header);
     card.appendChild(panesContainer);
-    
+
+    initDragAndDrop(card);
+
     return card;
 }
 
@@ -354,7 +457,9 @@ function updatePaneContent(paneId) {
         content.innerHTML = html;
         
         if (wasAtBottom) {
-            content.scrollTop = content.scrollHeight;
+            requestAnimationFrame(() => {
+                content.scrollTop = content.scrollHeight;
+            });
         }
     });
 }
@@ -403,6 +508,8 @@ function renderSessions(sessions) {
                 container.appendChild(createSessionCard(session));
             }
         });
+
+        applyStoredOrder(container);
         
         if (container.querySelector('.loading')) {
             container.querySelector('.loading')?.remove();

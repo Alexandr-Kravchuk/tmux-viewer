@@ -362,3 +362,25 @@ body.has-fullscreen main {
 .fullscreen-btn:hover {
     color: #58a6ff;
 }
+
+.drag-handle {
+    cursor: grab;
+    color: #6e7681;
+    font-size: 16px;
+    padding: 0 4px;
+    user-select: none;
+    flex: 0 0 auto;
+}
+
+.drag-handle:hover {
+    color: #c5c8c6;
+}
+
+.session-card.dragging {
+    opacity: 0.4;
+}
+
+.session-card.drag-over {
+    border-color: #58a6ff;
+    box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.25);
+}
