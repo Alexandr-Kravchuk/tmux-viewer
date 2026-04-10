@@ -168,10 +168,30 @@ func RenameSession(oldName, newName string) error {
 	if newName == "" {
 		return fmt.Errorf("new name cannot be empty")
 	}
-	
+
 	cmd := exec.Command("tmux", "rename-session", "-t", oldName, newName)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to rename session %s to %s: %w", oldName, newName, err)
+	}
+	return nil
+}
+
+func SendKeys(sessionName, command string) error {
+	cmd := exec.Command("tmux", "send-keys", "-t", sessionName, command, "Enter")
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to send keys to session %s: %w (stderr: %s)", sessionName, err, stderr.String())
+	}
+	return nil
+}
+
+func SendRawKeys(sessionName, keys string) error {
+	cmd := exec.Command("tmux", "send-keys", "-t", sessionName, keys)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to send keys to session %s: %w (stderr: %s)", sessionName, err, stderr.String())
 	}
 	return nil
 }

@@ -384,3 +384,66 @@ body.has-fullscreen main {
     border-color: #58a6ff;
     box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.25);
 }
+
+.cmd-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: #1a1e24;
+    border-top: 1px solid #30363d;
+    flex: 0 0 auto;
+}
+
+.cmd-input {
+    flex: 1;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    color: #c5c8c6;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.cmd-input:focus {
+    border-color: #58a6ff;
+}
+
+.cmd-input::placeholder {
+    color: #484f58;
+}
+
+.action-btn.run-btn:hover {
+    background: #1f3a1f;
+    border-color: #3fb950;
+    color: #3fb950;
+}
+
+.action-btn.rerun-btn:hover {
+    background: #1f2d3f;
+    border-color: #58a6ff;
+    color: #58a6ff;
+}
+
+.action-btn.special-key-btn {
+    font-size: 12px;
+    width: 26px;
+    height: 26px;
+}
+
+.action-btn.special-key-btn:hover {
+    background: #2d2d1f;
+    border-color: #e3b341;
+    color: #e3b341;
+}
+
+.cmd-divider {
+    width: 1px;
+    height: 20px;
+    background: #30363d;
+    flex: 0 0 auto;
+    margin: 0 2px;
+}

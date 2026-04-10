@@ -187,6 +187,53 @@ end tell
 	})
 }
 
+func handleRunCommand(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	parts := strings.Split(r.URL.Path, "/")
+	if len(parts) < 4 {
+		http.Error(w, "Invalid session path", http.StatusBadRequest)
+		return
+	}
+
+	sessionName, _ := url.PathUnescape(parts[3])
+
+	var reqBody struct {
+		Command string `json:"command"`
+		Raw     bool   `json:"raw"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if reqBody.Command == "" {
+		http.Error(w, "Command cannot be empty", http.StatusBadRequest)
+		return
+	}
+
+	var sendErr error
+	if reqBody.Raw {
+		sendErr = tmux.SendRawKeys(sessionName, reqBody.Command)
+	} else {
+		sendErr = tmux.SendKeys(sessionName, reqBody.Command)
+	}
+	if sendErr != nil {
+		http.Error(w, fmt.Sprintf("Error sending command: %v", sendErr), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":  "success",
+		"message": fmt.Sprintf("Command sent to session %s", sessionName),
+	})
+}
+
 func handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	var reqBody struct {
 		Name string `json:"name"`
@@ -216,6 +263,8 @@ func setupRoutes() *http.ServeMux {
 			handleRenameSession(w, r)
 		} else if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/open-terminal") {
 			handleOpenTerminal(w, r)
+		} else if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/run-command") {
+			handleRunCommand(w, r)
 		} else {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}

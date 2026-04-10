@@ -6,6 +6,7 @@ let updateTimer = null;
 let ansi_up = null;
 let draggedCard = null;
 const SESSION_ORDER_KEY = 'tmux-session-order';
+const LAST_CMD_PREFIX = 'tmux-last-cmd-';
 
 function loadSessionOrder() {
     try {
@@ -45,7 +46,7 @@ function initDragAndDrop(card) {
     card.setAttribute('draggable', 'true');
 
     card.addEventListener('dragstart', (e) => {
-        if (e.target.closest('.session-actions') || e.target.closest('.panes-container')) {
+        if (e.target.closest('.session-actions') || e.target.closest('.panes-container') || e.target.closest('.cmd-bar')) {
             e.preventDefault();
             return;
         }
@@ -253,6 +254,58 @@ async function renameSession(sessionId, oldName) {
     }
 }
 
+function getLastCommand(sessionName) {
+    return localStorage.getItem(LAST_CMD_PREFIX + sessionName) || '';
+}
+
+function saveLastCommand(sessionName, command) {
+    localStorage.setItem(LAST_CMD_PREFIX + sessionName, command);
+}
+
+async function sendSpecialKey(sessionName, keys) {
+    try {
+        const response = await fetch(`/api/session/${encodeURIComponent(sessionName)}/run-command`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ command: keys, raw: true })
+        });
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(text || `HTTP ${response.status}`);
+        }
+    } catch (error) {
+        console.error('Error sending key:', error);
+        alert(`Failed to send key: ${error.message}`);
+    }
+}
+
+async function runCommand(sessionName, command, card) {
+    if (!command.trim()) return;
+
+    try {
+        const response = await fetch(`/api/session/${encodeURIComponent(sessionName)}/run-command`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ command })
+        });
+
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(text || `HTTP ${response.status}`);
+        }
+
+        saveLastCommand(sessionName, command);
+
+        const rerunBtn = card.querySelector('.rerun-btn');
+        if (rerunBtn) {
+            rerunBtn.title = `Re-run: ${command}`;
+        }
+    } catch (error) {
+        console.error('Error running command:', error);
+        alert(`Failed to run command: ${error.message}`);
+    }
+}
+
 async function openInTerminal(sessionName) {
     try {
         const response = await fetch(`/api/session/${encodeURIComponent(sessionName)}/open-terminal`, {
@@ -437,8 +490,82 @@ function createSessionCard(session) {
         panesContainer.appendChild(noPane);
     }
     
+    const cmdBar = document.createElement('div');
+    cmdBar.className = 'cmd-bar';
+
+    const specialKeys = [
+        { label: '^C', keys: 'C-c', title: 'Ctrl+C (interrupt)' },
+        { label: '↑',  keys: 'Up',  title: 'Arrow Up (history prev)' },
+        { label: '↓',  keys: 'Down', title: 'Arrow Down (history next)' },
+        { label: '⏎',  keys: 'Enter', title: 'Enter' },
+    ];
+    specialKeys.forEach(({ label, keys, title }) => {
+        const btn = document.createElement('button');
+        btn.className = 'action-btn special-key-btn';
+        btn.innerHTML = label;
+        btn.title = title;
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            sendSpecialKey(session.name, keys);
+        };
+        cmdBar.appendChild(btn);
+    });
+
+    const cmdDivider = document.createElement('div');
+    cmdDivider.className = 'cmd-divider';
+    cmdBar.appendChild(cmdDivider);
+
+    const cmdInput = document.createElement('input');
+    cmdInput.type = 'text';
+    cmdInput.className = 'cmd-input';
+    cmdInput.placeholder = 'Enter command...';
+
+    const runBtn = document.createElement('button');
+    runBtn.className = 'action-btn run-btn';
+    runBtn.innerHTML = '▶';
+    runBtn.title = 'Run command (Enter)';
+    runBtn.onclick = (e) => {
+        e.stopPropagation();
+        const cmd = cmdInput.value.trim();
+        if (cmd) {
+            runCommand(session.name, cmd, card);
+            cmdInput.value = '';
+        }
+    };
+
+    const lastCmd = getLastCommand(session.name);
+    const rerunBtn = document.createElement('button');
+    rerunBtn.className = 'action-btn rerun-btn';
+    rerunBtn.innerHTML = '↺';
+    rerunBtn.title = lastCmd ? `Re-run: ${lastCmd}` : 'No previous command';
+    rerunBtn.onclick = (e) => {
+        e.stopPropagation();
+        const cmd = getLastCommand(session.name);
+        if (cmd) {
+            cmdInput.value = cmd;
+            runCommand(session.name, cmd, card);
+            cmdInput.value = '';
+        }
+    };
+
+    cmdInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const cmd = cmdInput.value.trim();
+            if (cmd) {
+                runCommand(session.name, cmd, card);
+                cmdInput.value = '';
+            }
+        }
+    });
+
+    cmdBar.appendChild(cmdInput);
+    cmdBar.appendChild(runBtn);
+    cmdBar.appendChild(rerunBtn);
+
     card.appendChild(header);
     card.appendChild(panesContainer);
+    card.appendChild(cmdBar);
 
     initDragAndDrop(card);
 
