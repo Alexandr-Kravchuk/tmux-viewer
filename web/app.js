@@ -262,7 +262,26 @@ function saveLastCommand(sessionName, command) {
     localStorage.setItem(LAST_CMD_PREFIX + sessionName, command);
 }
 
-async function sendSpecialKey(sessionName, keys) {
+function flashButton(btn) {
+    const original = btn.innerHTML;
+    btn.innerHTML = '✓';
+    btn.classList.add('sent');
+    btn.disabled = true;
+    setTimeout(() => {
+        btn.innerHTML = original;
+        btn.classList.remove('sent');
+        btn.disabled = false;
+    }, 600);
+}
+
+function refreshCardPanes(card) {
+    card.querySelectorAll('[data-pane-id]').forEach(paneCard => {
+        paneCard.classList.add('refreshing');
+        updatePaneContent(paneCard.dataset.paneId);
+    });
+}
+
+async function sendSpecialKey(sessionName, keys, btn, card) {
     try {
         const response = await fetch(`/api/session/${encodeURIComponent(sessionName)}/run-command`, {
             method: 'POST',
@@ -273,6 +292,8 @@ async function sendSpecialKey(sessionName, keys) {
             const text = await response.text();
             throw new Error(text || `HTTP ${response.status}`);
         }
+        flashButton(btn);
+        refreshCardPanes(card);
     } catch (error) {
         console.error('Error sending key:', error);
         alert(`Failed to send key: ${error.message}`);
@@ -281,6 +302,10 @@ async function sendSpecialKey(sessionName, keys) {
 
 async function runCommand(sessionName, command, card) {
     if (!command.trim()) return;
+
+    const runBtn = card.querySelector('.run-btn');
+    const rerunBtn = card.querySelector('.rerun-btn');
+    if (runBtn) { runBtn.disabled = true; runBtn.innerHTML = '…'; }
 
     try {
         const response = await fetch(`/api/session/${encodeURIComponent(sessionName)}/run-command`, {
@@ -295,12 +320,15 @@ async function runCommand(sessionName, command, card) {
         }
 
         saveLastCommand(sessionName, command);
+        if (rerunBtn) rerunBtn.title = `Re-run: ${command}`;
 
-        const rerunBtn = card.querySelector('.rerun-btn');
-        if (rerunBtn) {
-            rerunBtn.title = `Re-run: ${command}`;
-        }
+        if (runBtn) { runBtn.innerHTML = '✓'; runBtn.classList.add('sent'); }
+        refreshCardPanes(card);
+        setTimeout(() => {
+            if (runBtn) { runBtn.innerHTML = '▶'; runBtn.classList.remove('sent'); runBtn.disabled = false; }
+        }, 600);
     } catch (error) {
+        if (runBtn) { runBtn.innerHTML = '▶'; runBtn.disabled = false; }
         console.error('Error running command:', error);
         alert(`Failed to run command: ${error.message}`);
     }
@@ -506,7 +534,7 @@ function createSessionCard(session) {
         btn.title = title;
         btn.onclick = (e) => {
             e.stopPropagation();
-            sendSpecialKey(session.name, keys);
+            sendSpecialKey(session.name, keys, btn, card);
         };
         cmdBar.appendChild(btn);
     });
@@ -575,14 +603,15 @@ function createSessionCard(session) {
 function updatePaneContent(paneId) {
     const paneCard = document.querySelector(`[data-pane-id="${paneId}"]`);
     if (!paneCard) return;
-    
+
     const content = paneCard.querySelector('.pane-content');
     if (!content) return;
-    
+
     fetchPaneContent(paneId).then(html => {
         const wasAtBottom = content.scrollHeight - content.scrollTop - content.clientHeight < 50;
         content.innerHTML = html;
-        
+        paneCard.classList.remove('refreshing');
+
         if (wasAtBottom) {
             requestAnimationFrame(() => {
                 content.scrollTop = content.scrollHeight;

@@ -240,6 +240,30 @@ main {
     flex-direction: column;
     flex: 1;
     min-height: 0;
+    position: relative;
+    overflow: hidden;
+}
+
+.pane-card.refreshing::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -60%;
+    width: 60%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #388bfd, #58a6ff, transparent);
+    animation: pane-sweep 0.7s ease-in-out;
+    z-index: 10;
+}
+
+.pane-card.refreshing .pane-content {
+    opacity: 0.7;
+    transition: opacity 0.15s;
+}
+
+@keyframes pane-sweep {
+    0%   { left: -60%; }
+    100% { left: 110%; }
 }
 
 .pane-card.active {
@@ -417,6 +441,13 @@ body.has-fullscreen main {
 }
 
 .action-btn.run-btn:hover {
+    background: #1f3a1f;
+    border-color: #3fb950;
+    color: #3fb950;
+}
+
+.action-btn.run-btn.sent,
+.action-btn.special-key-btn.sent {
     background: #1f3a1f;
     border-color: #3fb950;
     color: #3fb950;
